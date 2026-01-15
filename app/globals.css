@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Import Arabic fonts */
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&family=Cairo:wght@400;500;600;700&display=swap');
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-rgb: 249, 250, 251;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-rgb));
+  font-family: 'Tajawal', 'Cairo', sans-serif;
+}
+
+/* RTL Support */
+[dir="rtl"] {
+  text-align: right;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
+
+/* Recording animation */
+@keyframes pulse-recording {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}
+
+.recording-pulse {
+  animation: pulse-recording 1.5s ease-in-out infinite;
+}
+
+/* Button styles */
+.btn-primary {
+  @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+}
+
+.btn-secondary {
+  @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+}
+
+.btn-success {
+  @apply bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+}
+
+.btn-danger {
+  @apply bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+}
+
+/* Card styles */
+.card {
+  @apply bg-white rounded-xl shadow-md p-6;
+}
+
+/* Input styles */
+.input-field {
+  @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all duration-200;
+}
+
+/* Table styles */
+.data-table {
+  @apply w-full border-collapse;
+}
+
+.data-table th {
+  @apply bg-gray-100 text-gray-700 font-semibold py-3 px-4 text-right border-b-2 border-gray-200;
+}
+
+.data-table td {
+  @apply py-3 px-4 border-b border-gray-100;
+}
+
+.data-table tr:hover td {
+  @apply bg-gray-50;
+}
+
+/* Status badges */
+.badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+.badge-success {
+  @apply bg-green-100 text-green-800;
+}
+
+.badge-warning {
+  @apply bg-yellow-100 text-yellow-800;
+}
+
+.badge-error {
+  @apply bg-red-100 text-red-800;
+}
+
+.badge-info {
+  @apply bg-blue-100 text-blue-800;
+}
+
+/* Loading spinner */
+.spinner {
+  @apply animate-spin rounded-full border-2 border-gray-300 border-t-primary-600;
+}
