@@ -3,6 +3,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, Square, Loader2, AlertCircle } from 'lucide-react';
 
+interface RowData {
+  row_number: number;
+  extracted_data: Record<string, string | null>;
+}
+
 interface AudioRecorderProps {
   sessionId: string;
   rowNumber: number;
@@ -11,6 +16,8 @@ interface AudioRecorderProps {
     transcription: string;
     extractedData: Record<string, string | null>;
     confidence: number;
+    multiRow?: boolean;
+    rows?: RowData[];
   }) => void;
   onError: (error: string) => void;
   disabled?: boolean;
@@ -128,10 +135,11 @@ export default function AudioRecorder({
     try {
       const formData = new FormData();
       formData.append('file', audioBlob, 'recording.webm');
-      formData.append('row_number', rowNumber.toString());
+      formData.append('start_row', rowNumber.toString());
 
+      // Use the multi-row endpoint which handles both single and multi-row
       const response = await fetch(
-        `http://localhost:8000/api/v1/audio/process/${sessionId}`,
+        `http://localhost:8000/api/v1/audio/process-multi/${sessionId}`,
         {
           method: 'POST',
           body: formData,
@@ -145,11 +153,23 @@ export default function AudioRecorder({
 
       const data = await response.json();
 
-      onRecordingComplete({
-        transcription: data.transcription,
-        extractedData: data.extracted_data,
-        confidence: data.transcription_confidence,
-      });
+      // Handle both single and multi-row responses
+      if (data.multi_row && data.rows && data.rows.length > 1) {
+        onRecordingComplete({
+          transcription: data.transcription,
+          extractedData: data.rows[0].extracted_data,
+          confidence: data.transcription_confidence,
+          multiRow: true,
+          rows: data.rows,
+        });
+      } else {
+        onRecordingComplete({
+          transcription: data.transcription,
+          extractedData: data.rows[0].extracted_data,
+          confidence: data.transcription_confidence,
+          multiRow: false,
+        });
+      }
     } catch (error) {
       onError(error instanceof Error ? error.message : 'خطأ في معالجة الصوت');
     } finally {
@@ -248,8 +268,11 @@ export default function AudioRecorder({
           <AlertCircle className="w-5 h-5" />
           طريقة النطق:
         </h3>
-        <p className="text-sm text-yellow-700">
+        <p className="text-sm text-yellow-700 mb-2">
           انطق اسم العمود ثم قيمته. مثال: "الاسم محمد، الرقم خمسة وأربعون، الهاتف صفر تسعة تسعة ثمانية..."
+        </p>
+        <p className="text-sm text-yellow-700 font-medium">
+          لإدخال عدة صفوف: قل "السطر التالي" أو "صف جديد" للانتقال إلى صف جديد.
         </p>
       </div>
     </div>

@@ -27,10 +27,17 @@ interface SessionData {
   } | null;
 }
 
+interface RowData {
+  row_number: number;
+  extracted_data: Record<string, string | null>;
+}
+
 interface ExtractedData {
   transcription: string;
   extractedData: Record<string, string | null>;
   confidence: number;
+  multiRow?: boolean;
+  rows?: RowData[];
 }
 
 type Step = 'upload' | 'record' | 'preview' | 'edit';
@@ -45,6 +52,8 @@ export default function SessionPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState<Step>('upload');
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
+  const [multiRowData, setMultiRowData] = useState<RowData[] | null>(null);
+  const [currentMultiRowIndex, setCurrentMultiRowIndex] = useState(0);
   const [isConfirming, setIsConfirming] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -109,16 +118,33 @@ export default function SessionPage() {
 
   const handleRecordingComplete = (data: ExtractedData) => {
     setExtractedData(data);
+
+    // Handle multi-row data
+    if (data.multiRow && data.rows && data.rows.length > 1) {
+      setMultiRowData(data.rows);
+      setCurrentMultiRowIndex(0);
+      setSuccessMessage(`تم استخراج ${data.rows.length} صفوف من التسجيل!`);
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } else {
+      setMultiRowData(null);
+      setCurrentMultiRowIndex(0);
+    }
+
     setCurrentStep('edit');
   };
 
   const handleConfirm = async (data: Record<string, string | null>) => {
     if (!session?.excel_file) return;
 
+    // Determine which row number to confirm
+    const rowToConfirm = multiRowData
+      ? multiRowData[currentMultiRowIndex].row_number
+      : session.excel_file.current_row;
+
     setIsConfirming(true);
     try {
       const response = await fetch(
-        `http://localhost:8000/api/v1/rows/${sessionId}/${session.excel_file.current_row}/confirm`,
+        `http://localhost:8000/api/v1/rows/${sessionId}/${rowToConfirm}/confirm`,
         {
           method: 'POST',
           headers: {
@@ -126,7 +152,7 @@ export default function SessionPage() {
           },
           body: JSON.stringify({
             data,
-            auto_advance: true,
+            auto_advance: !multiRowData || currentMultiRowIndex >= (multiRowData.length - 1),
           }),
         }
       );
@@ -137,23 +163,39 @@ export default function SessionPage() {
 
       const result = await response.json();
 
-      // Update session with new current row
-      setSession((prev) =>
-        prev && prev.excel_file
-          ? {
-              ...prev,
-              excel_file: {
-                ...prev.excel_file,
-                current_row: result.next_row || prev.excel_file.current_row + 1,
-              },
-            }
-          : null
-      );
+      // Check if there are more rows in multi-row mode
+      if (multiRowData && currentMultiRowIndex < multiRowData.length - 1) {
+        // Move to next row in multi-row data
+        setCurrentMultiRowIndex((prev) => prev + 1);
+        setSuccessMessage(`تم حفظ الصف ${rowToConfirm} - متبقي ${multiRowData.length - currentMultiRowIndex - 1} صفوف`);
+        setTimeout(() => setSuccessMessage(null), 3000);
+      } else {
+        // All rows done, reset state
+        setSession((prev) =>
+          prev && prev.excel_file
+            ? {
+                ...prev,
+                excel_file: {
+                  ...prev.excel_file,
+                  current_row: result.next_row || prev.excel_file.current_row + 1,
+                },
+              }
+            : null
+        );
 
-      setExtractedData(null);
-      setCurrentStep('record');
-      setSuccessMessage(`تم حفظ الصف ${session.excel_file.current_row} بنجاح!`);
-      setTimeout(() => setSuccessMessage(null), 3000);
+        setExtractedData(null);
+        setMultiRowData(null);
+        setCurrentMultiRowIndex(0);
+        setCurrentStep('record');
+
+        const savedCount = multiRowData ? multiRowData.length : 1;
+        setSuccessMessage(
+          savedCount > 1
+            ? `تم حفظ ${savedCount} صفوف بنجاح!`
+            : `تم حفظ الصف ${rowToConfirm} بنجاح!`
+        );
+        setTimeout(() => setSuccessMessage(null), 3000);
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'خطأ في الحفظ');
       setTimeout(() => setError(null), 5000);
@@ -200,7 +242,24 @@ export default function SessionPage() {
 
   const handleRerecord = () => {
     setExtractedData(null);
+    setMultiRowData(null);
+    setCurrentMultiRowIndex(0);
     setCurrentStep('record');
+  };
+
+  // Get current row data for editing
+  const getCurrentRowData = () => {
+    if (multiRowData && multiRowData[currentMultiRowIndex]) {
+      return multiRowData[currentMultiRowIndex].extracted_data;
+    }
+    return extractedData?.extractedData || {};
+  };
+
+  const getCurrentRowNumber = () => {
+    if (multiRowData && multiRowData[currentMultiRowIndex]) {
+      return multiRowData[currentMultiRowIndex].row_number;
+    }
+    return session?.excel_file?.current_row || 1;
   };
 
   const handleDownload = () => {
@@ -344,18 +403,48 @@ export default function SessionPage() {
         <div className="space-y-6">
           {extractedData && session.excel_file && (
             <>
+              {/* Multi-row indicator */}
+              {multiRowData && multiRowData.length > 1 && (
+                <div className="card bg-blue-50 border-blue-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">
+                        {currentMultiRowIndex + 1}
+                      </div>
+                      <span className="text-blue-800 font-medium">
+                        الصف {currentMultiRowIndex + 1} من {multiRowData.length}
+                      </span>
+                    </div>
+                    <div className="flex gap-1">
+                      {multiRowData.map((_, idx) => (
+                        <div
+                          key={idx}
+                          className={`w-3 h-3 rounded-full ${
+                            idx < currentMultiRowIndex
+                              ? 'bg-green-500'
+                              : idx === currentMultiRowIndex
+                              ? 'bg-blue-600'
+                              : 'bg-gray-300'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <DataPreview
                 transcription={extractedData.transcription}
                 confidence={extractedData.confidence}
-                extractedData={extractedData.extractedData}
+                extractedData={getCurrentRowData()}
                 headers={session.excel_file.headers}
               />
 
               <RowEditor
                 sessionId={sessionId}
-                rowNumber={session.excel_file.current_row}
+                rowNumber={getCurrentRowNumber()}
                 headers={session.excel_file.headers}
-                initialData={extractedData.extractedData}
+                initialData={getCurrentRowData()}
                 onConfirm={handleConfirm}
                 onSkip={handleSkip}
                 onRerecord={handleRerecord}
