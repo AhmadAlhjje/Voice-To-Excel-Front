@@ -8,13 +8,16 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
-  BarChart3
+  BarChart3,
+  Table,
+  Mic,
 } from 'lucide-react';
 
 import ExcelUploader from '@/components/ExcelUploader';
 import AudioRecorder from '@/components/AudioRecorder';
 import DataPreview from '@/components/DataPreview';
 import RowEditor from '@/components/RowEditor';
+import ExcelTableView from '@/components/ExcelTableView';
 
 interface SessionData {
   session_id: string;
@@ -41,6 +44,7 @@ interface ExtractedData {
 }
 
 type Step = 'upload' | 'record' | 'preview' | 'edit';
+type ViewMode = 'record' | 'table';
 
 export default function SessionPage() {
   const params = useParams();
@@ -56,6 +60,7 @@ export default function SessionPage() {
   const [currentMultiRowIndex, setCurrentMultiRowIndex] = useState(0);
   const [isConfirming, setIsConfirming] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('record');
 
   useEffect(() => {
     loadSession();
@@ -344,142 +349,179 @@ export default function SessionPage() {
         </div>
       )}
 
-      {/* Progress indicator */}
+      {/* View Mode Toggle & Progress */}
       {session.excel_file && (
-        <div className="mb-6 card">
-          <div className="flex items-center gap-4">
-            <BarChart3 className="w-5 h-5 text-primary-600" />
-            <div className="flex-1">
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-600">التقدم</span>
-                <span className="font-medium text-gray-800">
-                  الصف {session.excel_file.current_row}
-                </span>
-              </div>
-              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary-600 transition-all duration-300"
-                  style={{
-                    width: `${Math.min(
-                      ((session.excel_file.current_row - 1) /
-                        Math.max(session.excel_file.total_rows || 10, 1)) *
-                        100,
-                      100
-                    )}%`,
-                  }}
-                />
+        <div className="mb-6 space-y-4">
+          {/* View Mode Toggle */}
+          <div className="flex items-center justify-center gap-2">
+            <button
+              onClick={() => setViewMode('record')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                viewMode === 'record'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              <Mic className="w-4 h-4" />
+              التسجيل
+            </button>
+            <button
+              onClick={() => setViewMode('table')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                viewMode === 'table'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              <Table className="w-4 h-4" />
+              عرض الجدول
+            </button>
+          </div>
+
+          {/* Progress indicator */}
+          {viewMode === 'record' && (
+            <div className="card">
+              <div className="flex items-center gap-4">
+                <BarChart3 className="w-5 h-5 text-primary-600" />
+                <div className="flex-1">
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600">التقدم</span>
+                    <span className="font-medium text-gray-800">
+                      الصف {session.excel_file.current_row}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary-600 transition-all duration-300"
+                      style={{
+                        width: `${Math.min(
+                          ((session.excel_file.current_row - 1) /
+                            Math.max(session.excel_file.total_rows || 10, 1)) *
+                            100,
+                          100
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
       {/* Main content */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left column */}
-        <div className="space-y-6">
-          {currentStep === 'upload' && (
-            <ExcelUploader
-              sessionId={sessionId}
-              onUploadSuccess={handleUploadSuccess}
-              onUploadError={handleUploadError}
-            />
-          )}
-
-          {(currentStep === 'record' || currentStep === 'edit') &&
-            session.excel_file && (
-              <AudioRecorder
+      {viewMode === 'table' && session.excel_file ? (
+        /* Table View */
+        <ExcelTableView sessionId={sessionId} onDownload={handleDownload} />
+      ) : (
+        /* Record View */
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left column */}
+          <div className="space-y-6">
+            {currentStep === 'upload' && (
+              <ExcelUploader
                 sessionId={sessionId}
-                rowNumber={session.excel_file.current_row}
-                headers={session.excel_file.headers}
-                onRecordingComplete={handleRecordingComplete}
-                onError={handleUploadError}
-                disabled={currentStep === 'edit'}
+                onUploadSuccess={handleUploadSuccess}
+                onUploadError={handleUploadError}
               />
             )}
-        </div>
 
-        {/* Right column */}
-        <div className="space-y-6">
-          {extractedData && session.excel_file && (
-            <>
-              {/* Multi-row indicator */}
-              {multiRowData && multiRowData.length > 1 && (
-                <div className="card bg-blue-50 border-blue-200">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">
-                        {currentMultiRowIndex + 1}
+            {(currentStep === 'record' || currentStep === 'edit') &&
+              session.excel_file && (
+                <AudioRecorder
+                  sessionId={sessionId}
+                  rowNumber={session.excel_file.current_row}
+                  headers={session.excel_file.headers}
+                  onRecordingComplete={handleRecordingComplete}
+                  onError={handleUploadError}
+                  disabled={currentStep === 'edit'}
+                />
+              )}
+          </div>
+
+          {/* Right column */}
+          <div className="space-y-6">
+            {extractedData && session.excel_file && (
+              <>
+                {/* Multi-row indicator */}
+                {multiRowData && multiRowData.length > 1 && (
+                  <div className="card bg-blue-50 border-blue-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">
+                          {currentMultiRowIndex + 1}
+                        </div>
+                        <span className="text-blue-800 font-medium">
+                          الصف {currentMultiRowIndex + 1} من {multiRowData.length}
+                        </span>
                       </div>
-                      <span className="text-blue-800 font-medium">
-                        الصف {currentMultiRowIndex + 1} من {multiRowData.length}
-                      </span>
-                    </div>
-                    <div className="flex gap-1">
-                      {multiRowData.map((_, idx) => (
-                        <div
-                          key={idx}
-                          className={`w-3 h-3 rounded-full ${
-                            idx < currentMultiRowIndex
-                              ? 'bg-green-500'
-                              : idx === currentMultiRowIndex
-                              ? 'bg-blue-600'
-                              : 'bg-gray-300'
-                          }`}
-                        />
-                      ))}
+                      <div className="flex gap-1">
+                        {multiRowData.map((_, idx) => (
+                          <div
+                            key={idx}
+                            className={`w-3 h-3 rounded-full ${
+                              idx < currentMultiRowIndex
+                                ? 'bg-green-500'
+                                : idx === currentMultiRowIndex
+                                ? 'bg-blue-600'
+                                : 'bg-gray-300'
+                            }`}
+                          />
+                        ))}
+                      </div>
                     </div>
                   </div>
+                )}
+
+                <DataPreview
+                  transcription={extractedData.transcription}
+                  confidence={extractedData.confidence}
+                  extractedData={getCurrentRowData()}
+                  headers={session.excel_file.headers}
+                />
+
+                <RowEditor
+                  sessionId={sessionId}
+                  rowNumber={getCurrentRowNumber()}
+                  headers={session.excel_file.headers}
+                  initialData={getCurrentRowData()}
+                  onConfirm={handleConfirm}
+                  onSkip={handleSkip}
+                  onRerecord={handleRerecord}
+                  isLoading={isConfirming}
+                />
+              </>
+            )}
+
+            {!extractedData && session.excel_file && currentStep === 'record' && (
+              <div className="card text-center py-12">
+                <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg
+                    className="w-12 h-12 text-gray-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+                    />
+                  </svg>
                 </div>
-              )}
-
-              <DataPreview
-                transcription={extractedData.transcription}
-                confidence={extractedData.confidence}
-                extractedData={getCurrentRowData()}
-                headers={session.excel_file.headers}
-              />
-
-              <RowEditor
-                sessionId={sessionId}
-                rowNumber={getCurrentRowNumber()}
-                headers={session.excel_file.headers}
-                initialData={getCurrentRowData()}
-                onConfirm={handleConfirm}
-                onSkip={handleSkip}
-                onRerecord={handleRerecord}
-                isLoading={isConfirming}
-              />
-            </>
-          )}
-
-          {!extractedData && session.excel_file && currentStep === 'record' && (
-            <div className="card text-center py-12">
-              <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg
-                  className="w-12 h-12 text-gray-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
-                  />
-                </svg>
+                <h3 className="text-lg font-medium text-gray-700 mb-2">
+                  ابدأ التسجيل الصوتي
+                </h3>
+                <p className="text-gray-500">
+                  انقر على زر التسجيل وانطق البيانات المطلوبة
+                </p>
               </div>
-              <h3 className="text-lg font-medium text-gray-700 mb-2">
-                ابدأ التسجيل الصوتي
-              </h3>
-              <p className="text-gray-500">
-                انقر على زر التسجيل وانطق البيانات المطلوبة
-              </p>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
